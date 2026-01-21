@@ -31,7 +31,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      # On garde la v5.3 qui a permis de démarrer le build
       image: docker.io/espressif/idf:release-v5.3
       options: --user root
 
@@ -57,18 +56,20 @@ jobs:
           git config --global --add safe.directory '*'
           . $IDF_PATH/export.sh
           
-          # --- CHIRURGIE PRECEDENTE (On garde tout) ---
+          # 1. On neutralise les sécurités du script (Exit si dossier existe + Git)
           sed -i '/You already have a deps directory/,+2 s/exit 1/true/' utils.sh
           sed -i '/git submodule/d' utils.sh
           sed -i '/git clone/d' utils.sh
+          
+          # 2. On supprime le conflit de version esp-dsp
           sed -i '/espressif\/esp-dsp/d' main/idf_component.yml || true
           
-          # --- LE PATCH ULTIME (FIX BOARD.H) ---
-          # On injecte le chemin de la carte S3-BOX directement dans le fichier CMakeLists.txt
-          # Cela force le système à inclure le bon dossier, quoi qu'il arrive.
+          # 3. LE PATCH ULTIME : ON ECIT L'ADRESSE EN DUR DANS LE FICHIER DE CONFIG
+          # On insère la variable AUDIO_BOARD_PATH tout en haut du fichier CMakeLists.txt
+          # Le chemin est absolu pour être sûr à 100%
           sed -i '1i set(AUDIO_BOARD_PATH "/__w/willow/willow/deps/esp-adf/components/audio_board/esp32_s3_box")' CMakeLists.txt
           
-          echo "Lancement de la fabrication finale..."
+          echo "Lancement de la fabrication..."
           ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode ${{ inputs.mode }}
 
       - name: Upload Artifact
