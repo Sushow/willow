@@ -56,25 +56,25 @@ jobs:
           git config --global --add safe.directory '*'
           . $IDF_PATH/export.sh
 
-          # 1. Patch : Désactive les commandes bloquantes du script
+          # 1. Patchs de sécurité du script (On garde ce qui marche)
           sed -i '/You already have a deps directory/,+2 s/exit 1/true/' utils.sh
           sed -i '/git submodule/d' utils.sh
           sed -i '/git clone/d' utils.sh
           sed -i '/espressif\/esp-dsp/d' main/idf_component.yml || true
 
-          # 2. LE CORRECTIF "FORCE-FEEDING" 
-          # On définit le chemin exact du dossier qui contient board.h
-          BOX_PATH="/__w/willow/willow/deps/esp-adf/components/audio_board/esp32_s3_box"
+          # 2. LE VRAI CHANGEMENT : MODIFICATION DE LA LIBRAIRIE DIRECTEMENT
+          # On va dans le dossier de la librairie audio et on force la variable AUDIO_BOARD_PATH
+          # directement dans son fichier de compilation.
+          # ${CMAKE_CURRENT_LIST_DIR} veut dire "le dossier où je suis", donc ça pointe direct sur le bon dossier.
           
-          # On l'injecte dans les drapeaux du compilateur (CFLAGS). 
-          # Le "-I" signifie "Include this directory". C'est un ordre direct au compilateur.
-          export CFLAGS="$CFLAGS -I$BOX_PATH -I$BOX_PATH/include"
-          export CXXFLAGS="$CXXFLAGS -I$BOX_PATH -I$BOX_PATH/include"
+          COMPONENT_CMAKE="deps/esp-adf/components/audio_board/CMakeLists.txt"
+          sed -i '1i set(AUDIO_BOARD_PATH ${CMAKE_CURRENT_LIST_DIR}/esp32_s3_box)' $COMPONENT_CMAKE
           
-          # On définit aussi la variable standard, au cas où.
-          export AUDIO_BOARD_PATH=$BOX_PATH
+          # Vérification (pour être sûr que la ligne est bien ajoutée)
+          echo "Vérification du patch :"
+          head -n 3 $COMPONENT_CMAKE
 
-          echo "Lancement de la fabrication avec injection CFLAGS..."
+          echo "Lancement de la fabrication..."
           ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode ${{ inputs.mode }}
 
       - name: Upload Artifact
