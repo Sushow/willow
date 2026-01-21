@@ -31,23 +31,24 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      # On garde l'image Espressif qui fonctionne bien
+      # On garde l'image Espressif officielle
       image: docker.io/espressif/idf:release-v5.1
       options: --user root
 
     steps:
       - name: Checkout Willow
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
+        # Pas de submodules ici, on gère ça nous-mêmes
 
       - name: Install Tools
         run: apt-get update && apt-get install -y jq git curl wget
 
       - name: Manual Dependency Install
         run: |
-          # On télécharge nous-mêmes la librairie audio pour éviter que le script ne plante
-          git clone --recursive https://github.com/espressif/esp-adf.git esp-adf
+          # On crée le dossier "deps" que le script attend
+          mkdir -p deps
+          # On clone la librairie dedans
+          git clone --recursive https://github.com/espressif/esp-adf.git deps/esp-adf
 
       - name: Build Willow
         shell: bash
@@ -55,16 +56,11 @@ jobs:
           git config --global --add safe.directory '*'
           . $IDF_PATH/export.sh
           
-          # LE PATCH ULTIME :
-          # On supprime purement et simplement les lignes "git submodule" et "git clone" du script.
-          # Comme on a déjà tout téléchargé à l'étape d'avant, ces lignes ne servent à rien à part planter.
-          sed -i '/git submodule/d' utils.sh
-          sed -i '/git clone/d' utils.sh
+          # LE PATCH : On remplace les commandes git qui plantent par "true" (pour ne rien faire)
+          # Utiliser "true" au lieu de supprimer la ligne évite les erreurs de syntaxe bash
+          sed -i 's/git submodule update --init --recursive/true/g' utils.sh
           
-          # On définit le chemin vers la librairie qu'on vient de télécharger
-          export ADF_PATH=$PWD/esp-adf
-          
-          # On lance l'installation (qui est maintenant inoffensive)
+          # On lance l'installation (le dossier est là, git est désactivé, ça doit passer)
           ./utils.sh install
           
           # On lance la fabrication
