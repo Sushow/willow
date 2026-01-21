@@ -1,18 +1,26 @@
----
 name: build-willow
 
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
 on:
-  workflow_call:
+  workflow_dispatch:
     inputs:
-      container-image:
+      wake_word:
+        description: 'Wake Word'
         required: true
-        type: string
-
+        default: 'hey_jarvis'
+        type: choice
+        options:
+        - hey_jarvis
+        - hi_esp
+        - alexa
+      board:
+        description: 'Board'
+        required: true
+        default: 'ESP32-S3-BOX'
+        type: choice
+        options:
+        - ESP32-S3-BOX
+        - ESP32-S3-BOX-3
+        - ESP32-S3-BOX-Lite
 jobs:
   build-willow-dist:
     strategy:
