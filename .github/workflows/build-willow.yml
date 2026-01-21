@@ -24,7 +24,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/heywillow/willow-build:main
+      # C'est ici la correction : on utilise l'adresse historique (Tovera) qui existe vraiment
+      image: ghcr.io/tovera/willow-build:main
       options: --user root
 
     steps:
@@ -34,7 +35,10 @@ jobs:
           submodules: recursive
 
       - name: Build Willow
-        run: ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode client
+        # J'ai ajouté 'git config' pour éviter une erreur de sécurité courante sur GitHub
+        run: |
+          git config --global --add safe.directory '*'
+          ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode client
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
