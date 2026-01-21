@@ -55,25 +55,23 @@ jobs:
         run: |
           git config --global --add safe.directory '*'
           . $IDF_PATH/export.sh
-          
-          # 1. On désactive les commandes git/install qui plantent
+
+          # 1. On empêche le script de planter si le dossier existe
           sed -i '/You already have a deps directory/,+2 s/exit 1/true/' utils.sh
+          
+          # 2. On supprime les commandes Git du script
           sed -i '/git submodule/d' utils.sh
           sed -i '/git clone/d' utils.sh
           
-          # 2. On désactive le conflit de version
+          # 3. On supprime le conflit de version
           sed -i '/espressif\/esp-dsp/d' main/idf_component.yml || true
-          
-          # 3. LE CORRECTIF BRUTAL 
 
-[Image of hammer]
+          # 4. FIX BOARD.H (Méthode sure sans casser le YAML)
+          # On écrit le chemin dans un fichier temporaire et on le colle au début de la config
+          echo 'set(AUDIO_BOARD_PATH "/__w/willow/willow/deps/esp-adf/components/audio_board/esp32_s3_box")' > header_fix.txt
+          cat header_fix.txt CMakeLists.txt > CMakeLists.tmp && mv CMakeLists.tmp CMakeLists.txt
 
-          # On remplace la commande "idf.py build" dans le script par une version qui contient le chemin EN DUR.
-          # On injecte l'argument -DAUDIO_BOARD_PATH=... directement dans la commande de build.
-          BOARD_PATH="/__w/willow/willow/deps/esp-adf/components/audio_board/esp32_s3_box"
-          sed -i "s|idf.py build|idf.py build -DAUDIO_BOARD_PATH=$BOARD_PATH|g" utils.sh
-          
-          echo "Lancement de la fabrication forcée..."
+          echo "Lancement de la fabrication..."
           ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode ${{ inputs.mode }}
 
       - name: Upload Artifact
