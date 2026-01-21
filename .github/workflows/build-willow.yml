@@ -19,23 +19,39 @@ on:
         type: choice
         options:
         - ESP32-S3-BOX
+      mode:
+        description: 'Mode'
+        required: true
+        default: 'client'
+        type: choice
+        options:
+        - client
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    # PLUS DE CONTENEUR ICI (C'est ça qui bloquait)
-    
+    container:
+      # ON UTILISE L'IMAGE OFFICIELLE ESPRESSIF (Toujours en ligne, pas d'erreur manifest)
+      image: docker.io/espressif/idf:release-v5.1
+      options: --user root
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Build Willow
-        # L'option --docker force le script à gérer l'image lui-même
+      - name: Install Tools
+        # On installe juste 'jq' qui manque parfois dans l'image officielle
         run: |
-          chmod +x utils.sh
-          ./utils.sh --docker build ${{ inputs.wake_word }} ${{ inputs.board }} --mode client
+          apt-get update && apt-get install -y jq
+
+      - name: Build Willow
+        run: |
+          git config --global --add safe.directory '*'
+          . $IDF_PATH/export.sh
+          # On lance le build standard
+          ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode ${{ inputs.mode }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
