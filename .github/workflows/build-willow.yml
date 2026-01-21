@@ -21,121 +21,36 @@ on:
         - ESP32-S3-BOX
         - ESP32-S3-BOX-3
         - ESP32-S3-BOX-Lite
+      mode:
+        description: 'Mode'
+        required: true
+        default: 'client'
+        type: choice
+        options:
+        - client
+
 jobs:
-  build-willow-dist:
-    strategy:
-      matrix:
-        device:
-          - ESP32-S3-BOX
-          - ESP32-S3-BOX-3
-          - ESP32-S3-BOX-LITE
-    runs-on: ubuntu-22.04
+  build:
+    runs-on: ubuntu-latest
     container:
-      image: ${{ inputs.container-image }}
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.github_token }}
-      volumes:
-        - "${{github.workspace}}:/willow"
-    # https://github.com/actions/runner/issues/878#issuecomment-1248930921
+      image: ghcr.io/heywillow/willow-build:main
     defaults:
       run:
         working-directory: /willow
-    env:
-      dist_filename: "willow-dist-${{ matrix.device }}.bin"
-      ota_filename: "willow-ota-${{ matrix.device }}.bin"
-      partitions_filename: "willow-partitions-${{ matrix.device }}"
-    permissions:
-      packages: read
+
     steps:
-      - name: checkout
+      - name: Checkout
         uses: actions/checkout@v4
-      - name: debug
-        run: echo ${{ inputs.container-tag }}
-      - name: ls -al
-        run: ls -al
-      - name: ls -al /
-        run: ls -al /
-      # fatal: detected dubious ownership in repository at '/willow'
-      - name: id
-        run: id
-      # ./utils.sh: line 193: idf.py: command not found
-      # - name: . $IDF_PATH/export.sh
-      #  run: . "$IDF_PATH/export.sh"
-      #  need to run it in the same step as utils.sh bloody hell
-      - name: env
-        run: env
-      - name: pwd
-        run: pwd
-      - name: add /willow to git safe directories
-        run: git config --global --add safe.directory /willow
-      # need to run with bash to avoid this error:
-      # /opt/esp/idf/export.sh: [[: not found
-      - name: ./utils.sh setup
-        run: ( . "$IDF_PATH/export.sh"; ./utils.sh setup )
-        shell: bash
-      - name: append device type to sdkconfig
-        run: echo "CONFIG_${{ matrix.device }}_BOARD=y" | sed 's/-/_/g' >> sdkconfig
-      - name: ./utils.sh build
-        run: ( . "$IDF_PATH/export.sh"; ./utils.sh build )
-        shell: bash
-      - name: ./utils.sh dist
-        run: ( . "$IDF_PATH/export.sh"; ./utils.sh dist )
-        shell: bash
-      - name: copy willow.bin to ota_filename
-        run: cp /willow/build/willow.bin "/willow/build/${{ env.ota_filename }}"
+        with:
+          path: /willow
+          submodules: recursive
 
-      - name: calculate sha256sum for willow.bin
-        run: cd /willow/build &&sha256sum "${{ env.ota_filename }}" > "${{ env.ota_filename }}.sha256sum.txt"
-      - name: calculate sha256sum for willow-dist.bin
-        run: cd /willow/build && sha256sum "${{ env.dist_filename }}" > "${{ env.dist_filename }}.sha256sum.txt"
+      - name: Build Willow
+        run: |
+          ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode ${{ inputs.mode }}
 
-      - name: upload willow-dist.bin artifacts
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: "${{ env.dist_filename }}"
-          path: "/willow/build/${{ env.dist_filename }}*"
-      - name: upload willow-ota.bin artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: "${{ env.ota_filename }}"
-          path: "/willow/build/${{ env.ota_filename }}*"
-      - name: upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: "${{ env.partitions_filename }}"
-          path: |
-            /willow/build/*.bin
-            /willow/build/srmodels/srmodels.bin
-            /willow/partitions_willow.csv
-            /willow/sdkconfig
-            !/willow/build/${{ env.dist_filename }}
-
-  publish-release:
-    if: github.ref_type == 'tag'
-    runs-on: ubuntu-22.04
-    needs: build-willow-dist
-    permissions:
-      contents: write
-      packages: read
-    steps:
-      - name: download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: '!*.dockerbuild'
-
-      - name: pwd
-        run: pwd
-
-      - name: find -ls
-        run: find -ls
-
-      - name: create sha256sums.txt
-        run: find -type f -name '*.sha256sum.txt' -exec cat {} + | sort -u > sha256sums.txt
-
-      - name: create release
-        uses: ncipollo/release-action@v1
-        with:
-          allowUpdates: false
-          artifacts: "sha256sums.txt,willow-dist-*/willow-dist-*.bin,willow-ota-*/willow-ota-*.bin"
-          prerelease: ${{ contains(github.ref, 'delete') || contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'pre') || contains(github.ref, 'rc') }}
+          name: willow-dist
+          path: /willow/dist
