@@ -19,15 +19,17 @@ on:
         type: choice
         options:
         - ESP32-S3-BOX
+      mode:
+        description: 'Mode'
+        required: true
+        default: 'client'
+        type: choice
+        options:
+        - client
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      # C'est ici la correction : on utilise l'adresse historique (Tovera) qui existe vraiment
-      image: ghcr.io/tovera/willow-build:main
-      options: --user root
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,10 +37,9 @@ jobs:
           submodules: recursive
 
       - name: Build Willow
-        # J'ai ajouté 'git config' pour éviter une erreur de sécurité courante sur GitHub
         run: |
-          git config --global --add safe.directory '*'
-          ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode client
+          chmod +x utils.sh
+          ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode ${{ inputs.mode }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
