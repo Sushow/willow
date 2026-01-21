@@ -31,23 +31,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      # On garde l'image Espressif officielle
       image: docker.io/espressif/idf:release-v5.1
       options: --user root
 
     steps:
       - name: Checkout Willow
         uses: actions/checkout@v4
-        # Pas de submodules ici, on gère ça nous-mêmes
+        # On ne télécharge pas les sous-modules automatiquement pour garder la main
 
       - name: Install Tools
         run: apt-get update && apt-get install -y jq git curl wget
 
       - name: Manual Dependency Install
         run: |
-          # On crée le dossier "deps" que le script attend
+          # 1. On crée le dossier et on télécharge esp-adf MANUELLEMENT (ça, ça marche sûr)
           mkdir -p deps
-          # On clone la librairie dedans
           git clone --recursive https://github.com/espressif/esp-adf.git deps/esp-adf
 
       - name: Build Willow
@@ -56,11 +54,22 @@ jobs:
           git config --global --add safe.directory '*'
           . $IDF_PATH/export.sh
           
-          # LE PATCH : On remplace les commandes git qui plantent par "true" (pour ne rien faire)
-          # Utiliser "true" au lieu de supprimer la ligne évite les erreurs de syntaxe bash
-          sed -i 's/git submodule update --init --recursive/true/g' utils.sh
+          # --- ZONE DE CHIRURGIE DU SCRIPT ---
           
-          # On lance l'installation (le dossier est là, git est désactivé, ça doit passer)
+          # PATCH 1 : Le script refuse de se lancer si 'deps' existe. On le force.
+          # On cherche la phrase d'erreur et on remplace le "exit 1" (Stop) qui suit par "true" (Continue)
+          sed -i '/You already have a deps directory/,+2 s/exit 1/true/' utils.sh
+          
+          # PATCH 2 : On supprime les commandes Git du script (puisqu'on a déjà tout téléchargé nous-mêmes)
+          sed -i '/git submodule/d' utils.sh
+          sed -i '/git clone/d' utils.sh
+          
+          # --- FIN DE LA CHIRURGIE ---
+          
+          # On définit le chemin vers l'audio (au cas où)
+          export ADF_PATH=$PWD/deps/esp-adf
+          
+          # On lance l'installation (Le script va râler mais continuer grâce au Patch 1)
           ./utils.sh install
           
           # On lance la fabrication
