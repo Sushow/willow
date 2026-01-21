@@ -19,38 +19,25 @@ on:
         type: choice
         options:
         - ESP32-S3-BOX
-        - ESP32-S3-BOX-3
-        - ESP32-S3-BOX-Lite
-      mode:
-        description: 'Mode'
-        required: true
-        default: 'client'
-        type: choice
-        options:
-        - client
 
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/heywillow/willow-build:main
-    defaults:
-      run:
-        working-directory: /willow
+      options: --user root
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          path: /willow
           submodules: recursive
 
       - name: Build Willow
-        run: |
-          ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode ${{ inputs.mode }}
+        run: ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode client
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: willow-dist
-          path: /willow/dist
+          path: dist
