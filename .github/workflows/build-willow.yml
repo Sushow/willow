@@ -31,7 +31,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      # ON UTILISE L'IMAGE OFFICIELLE ESPRESSIF (Toujours en ligne, pas d'erreur manifest)
       image: docker.io/espressif/idf:release-v5.1
       options: --user root
 
@@ -42,7 +41,6 @@ jobs:
           submodules: recursive
 
       - name: Install Tools
-        # On installe juste 'jq' qui manque parfois dans l'image officielle
         run: |
           apt-get update && apt-get install -y jq
 
@@ -50,7 +48,11 @@ jobs:
         run: |
           git config --global --add safe.directory '*'
           . $IDF_PATH/export.sh
-          # On lance le build standard
+          
+          # C'EST ICI LA CORRECTION : ON INSTALLE LES DEPENDANCES AVANT
+          ./utils.sh install
+          
+          # ENSUITE ON LANCE LE BUILD
           ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode ${{ inputs.mode }}
 
       - name: Upload Artifact
