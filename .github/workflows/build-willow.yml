@@ -31,28 +31,33 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
+      # On garde l'image officielle Espressif car elle fonctionne bien
       image: docker.io/espressif/idf:release-v5.1
       options: --user root
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
+        # MODIFICATION CRITIQUE : On a retiré "submodules: recursive"
+        # On laisse le script "install" gérer ça tout seul pour éviter le conflit.
 
       - name: Install Tools
         run: |
-          apt-get update && apt-get install -y jq
+          apt-get update && apt-get install -y jq git curl wget
 
       - name: Build Willow
+        shell: bash
         run: |
+          # Sécurité Git pour éviter les erreurs de dossier
           git config --global --add safe.directory '*'
+          
+          # On charge les outils ESP
           . $IDF_PATH/export.sh
           
-          # C'EST ICI LA CORRECTION : ON INSTALLE LES DEPENDANCES AVANT
+          # 1. On installe les dépendances (ADF, etc.) proprement
           ./utils.sh install
           
-          # ENSUITE ON LANCE LE BUILD
+          # 2. On lance la fabrication
           ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode ${{ inputs.mode }}
 
       - name: Upload Artifact
