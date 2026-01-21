@@ -31,39 +31,46 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      # Image officielle Espressif (Stable)
       image: docker.io/espressif/idf:release-v5.1
       options: --user root
 
     steps:
       - name: Checkout Willow
         uses: actions/checkout@v4
-        # Pas de submodules pour garder la main
 
       - name: Install Tools
         run: apt-get update && apt-get install -y jq git curl wget
 
-      - name: Manual Setup (Remplaçant l'install buggée)
+      - name: Manual Setup
         run: |
-          # 1. On crée le dossier et on télécharge esp-adf nous-mêmes
           mkdir -p deps
           git clone --recursive https://github.com/espressif/esp-adf.git deps/esp-adf
-          
-          # 2. On installe les librairies Python manuellement (ce que le script aurait dû faire)
-          # On tente d'installer s'il y a un fichier requirements, sinon on continue
           [ -f requirements.txt ] && pip install -r requirements.txt || true
 
       - name: Build Willow
         shell: bash
         env:
-          # On dit au système où on a rangé l'audio
           ADF_PATH: /__w/willow/willow/deps/esp-adf
+          # CORRECTION 1 : On force le bon processeur pour la S3-BOX
+          IDF_TARGET: esp32s3
         run: |
           git config --global --add safe.directory '*'
           . $IDF_PATH/export.sh
           
-          # ON SAUTE L'ETAPE 'INSTALL' QUI PLANTAIT
-          # On passe direct au build
+          # --- CHIRURGIE ---
+          
+          # 1. On empêche le script de planter si le dossier existe
+          sed -i '/You already have a deps directory/,+2 s/exit 1/true/' utils.sh
+          
+          # 2. On supprime les commandes Git inutiles
+          sed -i '/git submodule/d' utils.sh
+          sed -i '/git clone/d' utils.sh
+          
+          # 3. LE NOUVEAU PATCH : On supprime la ligne qui impose la vieille version de esp-dsp
+          # Cela force Willow à accepter la version 1.6.0 fournie par ADF
+          sed -i '/espressif\/esp-dsp/d' main/idf_component.yml || true
+          
+          # --- FIN CHIRURGIE ---
           
           echo "Lancement de la fabrication..."
           ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode ${{ inputs.mode }}
