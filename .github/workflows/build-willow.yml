@@ -31,7 +31,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      # MISE A JOUR : On utilise la version 5.3 exigée par le projet
+      # On garde la v5.3 qui a permis de démarrer le build
       image: docker.io/espressif/idf:release-v5.3
       options: --user root
 
@@ -57,21 +57,18 @@ jobs:
           git config --global --add safe.directory '*'
           . $IDF_PATH/export.sh
           
-          # --- CHIRURGIE (On garde tout ce qui marche) ---
+          # --- CORRECTION DU CHEMIN (Le Chainon Manquant) ---
+          # On dit explicitement où se trouve le fichier board.h pour la S3-BOX
+          export AUDIO_BOARD_PATH=$ADF_PATH/components/audio_board/esp32_s3_box
           
-          # 1. On force le script à continuer même si le dossier existe
+          # --- CHIRURGIE PRECEDENTE (On garde tout) ---
           sed -i '/You already have a deps directory/,+2 s/exit 1/true/' utils.sh
-          
-          # 2. On désactive Git dans le script
           sed -i '/git submodule/d' utils.sh
           sed -i '/git clone/d' utils.sh
-          
-          # 3. On supprime les conflits de version (esp-dsp)
           sed -i '/espressif\/esp-dsp/d' main/idf_component.yml || true
+          # -----------------------------------------------
           
-          # --- FIN CHIRURGIE ---
-          
-          echo "Lancement de la fabrication avec IDF 5.3..."
+          echo "Lancement de la fabrication finale..."
           ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode ${{ inputs.mode }}
 
       - name: Upload Artifact
