@@ -6,81 +6,32 @@ on:
       wake_word:
         description: 'Wake Word'
         required: true
-        default: 'hey_jarvis'
+        default: 'hi_esp'
         type: choice
         options:
-        - hey_jarvis
         - hi_esp
         - alexa
-      board:
-        description: 'Board'
-        required: true
-        default: 'ESP32-S3-BOX'
-        type: choice
-        options:
-        - ESP32-S3-BOX
-      mode:
-        description: 'Mode'
-        required: true
-        default: 'client'
-        type: choice
-        options:
-        - client
+        - hey_jarvis
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: docker.io/espressif/idf:release-v5.3
-      options: --user root
-
     steps:
-      - name: Checkout Willow
+      - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Install Tools
-        run: apt-get update && apt-get install -y jq git curl wget
-
-      - name: Manual Setup
-        run: |
-          mkdir -p deps
-          git clone --recursive https://github.com/espressif/esp-adf.git deps/esp-adf
-          [ -f requirements.txt ] && pip install -r requirements.txt --break-system-packages || true
-
-      - name: Build Willow
-        shell: bash
-        env:
-          ADF_PATH: /__w/willow/willow/deps/esp-adf
-          IDF_TARGET: esp32s3
-        run: |
-          git config --global --add safe.directory '*'
-          . $IDF_PATH/export.sh
-
-          # 1. Patch : Désactive les commandes bloquantes du script
-          sed -i '/You already have a deps directory/,+2 s/exit 1/true/' utils.sh
-          sed -i '/git submodule/d' utils.sh
-          sed -i '/git clone/d' utils.sh
-          sed -i '/espressif\/esp-dsp/d' main/idf_component.yml || true
-
-          # 2. LE PATCH BARBARE : COPIE PHYSIQUE DES FICHIERS 
-          # Le compilateur cherche "board.h" dans ".../audio_board/include/"
-          # Le fichier est dans ".../audio_board/esp32_s3_box/"
-          # ON LE DÉPLACE DE FORCE.
-          
-          echo "Déplacement manuel des fichiers board.h..."
-          
-          SOURCE_DIR="deps/esp-adf/components/audio_board/esp32_s3_box"
-          DEST_DIR="deps/esp-adf/components/audio_board/include"
-          
-          # On copie board.h et board_pins_config.h directement dans le dossier include général
-          cp $SOURCE_DIR/board.h $DEST_DIR/board.h
-          cp $SOURCE_DIR/board_pins_config.h $DEST_DIR/board_pins_config.h
-          
-          # On vérifie que la copie a marché
-          ls -l $DEST_DIR/board.h
-
-          echo "Lancement de la fabrication..."
-          ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode ${{ inputs.mode }}
+      - name: Build with Tovera Image
+        uses: addnab/docker-run-action@v3
+        with:
+          # On utilise l'image maintenue par Tovera qui possède TOUS les fichiers board.h
+          image: ghcr.io/toverainc/willow-build:latest
+          options: -v ${{ github.workspace }}:/willow
+          run: |
+            cd /willow
+            # Cette image contient déjà l'environnement exporté et les dépendances
+            ./utils.sh build ${{ inputs.wake_word }} ESP32-S3-BOX --mode client
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
