@@ -31,7 +31,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: docker.io/espressif/idf:release-v5.1
+      # MISE A JOUR : On utilise la version 5.3 exigée par le projet
+      image: docker.io/espressif/idf:release-v5.3
       options: --user root
 
     steps:
@@ -45,34 +46,32 @@ jobs:
         run: |
           mkdir -p deps
           git clone --recursive https://github.com/espressif/esp-adf.git deps/esp-adf
-          [ -f requirements.txt ] && pip install -r requirements.txt || true
+          [ -f requirements.txt ] && pip install -r requirements.txt --break-system-packages || true
 
       - name: Build Willow
         shell: bash
         env:
           ADF_PATH: /__w/willow/willow/deps/esp-adf
-          # CORRECTION 1 : On force le bon processeur pour la S3-BOX
           IDF_TARGET: esp32s3
         run: |
           git config --global --add safe.directory '*'
           . $IDF_PATH/export.sh
           
-          # --- CHIRURGIE ---
+          # --- CHIRURGIE (On garde tout ce qui marche) ---
           
-          # 1. On empêche le script de planter si le dossier existe
+          # 1. On force le script à continuer même si le dossier existe
           sed -i '/You already have a deps directory/,+2 s/exit 1/true/' utils.sh
           
-          # 2. On supprime les commandes Git inutiles
+          # 2. On désactive Git dans le script
           sed -i '/git submodule/d' utils.sh
           sed -i '/git clone/d' utils.sh
           
-          # 3. LE NOUVEAU PATCH : On supprime la ligne qui impose la vieille version de esp-dsp
-          # Cela force Willow à accepter la version 1.6.0 fournie par ADF
+          # 3. On supprime les conflits de version (esp-dsp)
           sed -i '/espressif\/esp-dsp/d' main/idf_component.yml || true
           
           # --- FIN CHIRURGIE ---
           
-          echo "Lancement de la fabrication..."
+          echo "Lancement de la fabrication avec IDF 5.3..."
           ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode ${{ inputs.mode }}
 
       - name: Upload Artifact
