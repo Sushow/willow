@@ -56,20 +56,22 @@ jobs:
           git config --global --add safe.directory '*'
           . $IDF_PATH/export.sh
 
-          # 1. On empêche le script de planter si le dossier existe
-          sed -i '/You already have a deps directory/,+2 s/exit 1/true/' utils.sh
-          
-          # 2. On supprime les commandes Git du script
+          # 1. Patch : Desactiver les commandes Git du script original
           sed -i '/git submodule/d' utils.sh
           sed -i '/git clone/d' utils.sh
           
-          # 3. On supprime le conflit de version
+          # 2. Patch : Eviter le plantage si le dossier deps existe
+          sed -i '/You already have a deps directory/,+2 s/exit 1/true/' utils.sh
+          
+          # 3. Patch : Retirer le conflit de version esp-dsp
           sed -i '/espressif\/esp-dsp/d' main/idf_component.yml || true
 
-          # 4. FIX BOARD.H (Méthode sure sans casser le YAML)
-          # On écrit le chemin dans un fichier temporaire et on le colle au début de la config
-          echo 'set(AUDIO_BOARD_PATH "/__w/willow/willow/deps/esp-adf/components/audio_board/esp32_s3_box")' > header_fix.txt
-          cat header_fix.txt CMakeLists.txt > CMakeLists.tmp && mv CMakeLists.tmp CMakeLists.txt
+          # 4. Patch : FORCER LE CHEMIN DE LA CARTE (Fix board.h)
+          # On ecrit la ligne de configuration directement au debut du fichier CMakeLists.txt
+          # Cela force le compilateur a inclure le dossier de la S3-BOX
+          echo 'set(AUDIO_BOARD_PATH "${CMAKE_CURRENT_SOURCE_DIR}/deps/esp-adf/components/audio_board/esp32_s3_box")' > header_fix.txt
+          cat header_fix.txt CMakeLists.txt > CMakeLists.new
+          mv CMakeLists.new CMakeLists.txt
 
           echo "Lancement de la fabrication..."
           ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode ${{ inputs.mode }}
