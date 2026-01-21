@@ -31,7 +31,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      # On garde l'image officielle Espressif car elle est stable
+      # On garde l'image officielle Espressif (stable et reconnue)
       image: docker.io/espressif/idf:release-v5.1
       options: --user root
 
@@ -39,7 +39,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive # On laisse GitHub gérer les sous-dossiers proprement
+          submodules: recursive
 
       - name: Install Tools
         run: |
@@ -48,17 +48,17 @@ jobs:
       - name: Build Willow
         shell: bash
         run: |
-          # 1. Sécurité Git
+          # 1. Sécurité Git (obligatoire)
           git config --global --add safe.directory '*'
           
-          # 2. On charge les outils ESP
+          # 2. On charge l'environnement ESP
           . $IDF_PATH/export.sh
           
-          # 3. LE PATCH : On désactive la commande git qui plante dans le script
-          # On remplace "git submodule update..." par un commentaire "# skipped"
-          sed -i 's/git submodule update --init --recursive/# skipped crashing git command/g' utils.sh
+          # 3. LE PATCH MAGIQUE :
+          # On cherche la commande "git submodule update..." qui plante et on la remplace par "true" (succès forcé)
+          sed -i 's/git submodule update --init --recursive/true/g' utils.sh
           
-          # 4. On lance l'installation (qui ne plantera plus grâce au patch)
+          # 4. On lance l'installation (elle ne plantera plus car la ligne buggée est désactivée)
           ./utils.sh install
           
           # 5. On lance la fabrication
