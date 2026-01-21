@@ -23,11 +23,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      # CORRECTION ICI: J'utilise 'master' au lieu de 'main'. L'image existe sous ce nom.
-      image: ghcr.io/tovera/willow-build:master
-      options: --user root
-
+    # PLUS DE CONTENEUR ICI (C'est ça qui bloquait)
+    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,10 +32,10 @@ jobs:
           submodules: recursive
 
       - name: Build Willow
-        # J'ajoute la sécurité git pour éviter tout blocage
+        # L'option --docker force le script à gérer l'image lui-même
         run: |
-          git config --global --add safe.directory '*'
-          ./utils.sh build ${{ inputs.wake_word }} ${{ inputs.board }} --mode client
+          chmod +x utils.sh
+          ./utils.sh --docker build ${{ inputs.wake_word }} ${{ inputs.board }} --mode client
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
